@@ -1,0 +1,5 @@
+figure()
+h=contourf(va)
+set(h,'alphadata',~isnan(va))
+%set(gca,'ydir','normal')
+colorbar()
