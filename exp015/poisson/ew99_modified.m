@@ -1,36 +1,9 @@
-clear all
-close all
-% add library paths
-restoredefaultpath
-addpath(genpath('../../gsw_matlab_v3_02'))
-addpath(genpath('../../omega/ansu_utils/external_scripts/'))
-addpath(genpath('.'))
-
-total_time=tic;
-[s,ct,p,gamma_96,lats,longs]=gammanc_to_sctp;
-
-[s,ct,gamma_96]=make_mask_96(s,ct,p,gamma_96,longs,lats);
-
-save('data/input_data.mat')
+function [ew99,ew99_mod]=ew99_modified(s,ct,p,dx,dy,dz)
 
 user_input;
 
-
-la=squeeze(lats(1,:,:));
-lo=squeeze(longs(1,:,:));
-
-[dy,dx]=scale_fac(la,lo);
-%save('data/dxdy.mat', 'dx','dy') 
-%load('data/dxdy.mat');
 [nz,ny,nx]=size(s);
-dx=repmat(permute(dx,[3 1 2]),[nz 1 1]);
-dy=repmat(permute(dy,[3 1 2]),[nz 1 1]);
-dz=circshift(p,[-1 0 0])-p;
-dz(end,:,:)=nan;
- dx=0*dx+1;
- dy=0*dy+1;
- dz=0*dz+1;
- 
+
 [n1,n2,n3]=get_n(s,ct,p,dx,dy,dz);
 [divn,interior,dx3,dy3,dz3]=div_n(n1,n2,n3,dx,dy,dz);
 bdy= ~isnan(s) & ~interior;
@@ -202,9 +175,9 @@ b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
 
 %keyboard
 gamma_initial=zeros(n,1);
-nit=10000;
+nit=100;
     %keyboard
-    nit_p=20;
+    nit_p=2;
 for ii=1:nit_p
     disp(['ii=',num2str(ii)]);
     disp('starting LSQR()')
@@ -235,68 +208,17 @@ for ii=1:nit_p
     
     gamma_initial=gamma_p(gam);
     nit=400;
-%     if ii==nit_p-1
-%         nit=2000;
-%     end
+
     if ii==1
         myb=bb;
+        ew99=gamma_p;
     else
         myb=myb.*bb;
     end
     if ii==nit_p
-        save_netcdf03(myb,'b','data/b.nc')
-        save_netcdf03(gamma_p,'gamma_p','data/gamma_p.nc')
+        ew99_mod=gamma_p;
+        save_netcdf03(myb,'myb','data/bb.nc');
+        save_netcdf03(gamma_p,'mygamma_p','data/gamma_p_.nc');
     end
-    
-    %keyboard
+
 end
-
-display(['Total runtime ',num2str(toc(total_time)),' seconds'])
-
-
-% no_eq= ge+gw+gn+gs+gl+gu; 
-% has_eq=no_eq(:)~=0;
-% no_eq=no_eq(has_eq); % number of equations at point
-% nox=sum(has_eq);
-% ibdy=sreg(has_eq);
-% 
-% jstart=1;
-% c_e=1; % counter east
-% c_w=1; % counter west
-% c_n=1; % counter north
-% c_s=1; % counter south
-% 
-% for ii=1:length(ibdy)
-%     ix=ibdy(ii);
-%     jend=jstart+no_eq(ix)-1;
-%     j1(jstart:jend)=ix;
-%     cnt=0;
-%     if ge(ix)
-%         i_e(c_e)=jstart+cnt;
-%         cnt=cnt+1;
-%         c_e=c_e+1;
-%     end
-%     if west(ix)
-%         i_w(c_w)=jstart+cnt;
-%         cnt=cnt+1;   
-%         c_w=c_w+1;
-%     end
-%     if north(ix)
-%         i_n(c_n)=jstart+cnt;
-%         cnt=cnt+1;  
-%         c_n=c_n+1;
-%     end
-%     if south(ix)
-%         i_s(c_s)=jstart+cnt;
-%         cnt=cnt+1; 
-%         c_s=c_s+1;        
-%     end
-%     jstart=jend+1;    
-% end
-% %si=sum(int);
-% 
-% 
-% keyboard
-% 
-% 
-% 

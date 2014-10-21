@@ -45,13 +45,13 @@ int=interior(:);
 % gs= bdy & circshift(interior,[0 -1  0]);
 % gl= bdy & circshift(interior,[1  0  0]);
 % gu= bdy & circshift(interior,[-1 0  0]);
-% boundary points which have a neighbour
-ge= bdy & circshift(interior|bdy,[0  0  1]); 
-gw= bdy & circshift(interior|bdy,[0  0 -1]);
-gn= bdy & circshift(interior|bdy,[0  1  0]);
-gs= bdy & circshift(interior|bdy,[0 -1  0]);
-gl= bdy & circshift(interior|bdy,[1  0  0]);
-gu= bdy & circshift(interior|bdy,[-1 0  0]);
+% boundary points which have an interior neighbour
+ge= bdy & circshift(interior,[0  0  1]); 
+gw= bdy & circshift(interior,[0  0 -1]);
+gn= bdy & circshift(interior,[0  1  0]);
+gs= bdy & circshift(interior,[0 -1  0]);
+gl= bdy & circshift(interior,[1  0  0]);
+gu= bdy & circshift(interior,[-1 0  0]);
 
 if ~zonally_periodic
     ge(:,:,1)=false;
@@ -66,6 +66,46 @@ no_bdyeq= ge+gw+gn+gs+gl+gu; % number of boundary eq. at point
 has_bdyeq=no_bdyeq(:)~=0;
 
 gam= int | has_bdyeq;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+s(~gam)=nan;
+ct(~gam)=nan;
+[n1,n2,n3]=get_n(s,ct,p,dx,dy,dz);
+[divn,interior,dx3,dy3,dz3]=div_n(n1,n2,n3,dx,dy,dz);
+bdy= ~isnan(s) & ~interior;
+int=interior(:);
+%sreg=cumsum(int); % label interior grid points
+%sreg(~int)=nan;
+
+% % boundary points which have a neighbouring intererior point
+% ge= bdy & circshift(interior,[0  0  1]); % westward neighbour is interior pt -> form eastward gradient eq. here
+% gw= bdy & circshift(interior,[0  0 -1]);
+% gn= bdy & circshift(interior,[0  1  0]);
+% gs= bdy & circshift(interior,[0 -1  0]);
+% gl= bdy & circshift(interior,[1  0  0]);
+% gu= bdy & circshift(interior,[-1 0  0]);
+% boundary points which have an interior neighbour
+ge= bdy & circshift(interior,[0  0  1]); 
+gw= bdy & circshift(interior,[0  0 -1]);
+gn= bdy & circshift(interior,[0  1  0]);
+gs= bdy & circshift(interior,[0 -1  0]);
+gl= bdy & circshift(interior,[1  0  0]);
+gu= bdy & circshift(interior,[-1 0  0]);
+
+if ~zonally_periodic
+    ge(:,:,1)=false;
+    gw(:,:,end)=false;
+end
+gn(:,1,:)=false;
+gs(:,end,:)=false;
+gl(1,:,:)=false;
+gu(end,:,:)=false;
+
+no_bdyeq= ge+gw+gn+gs+gl+gu; % number of boundary eq. at point
+has_bdyeq=no_bdyeq(:)~=0;
+
+gam= int | has_bdyeq;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % numbering well definied gammas
 sreg=cumsum(gam);
@@ -151,8 +191,7 @@ i1l=i1u(end)+(1:length(j1l));
 jcol_bdy=[j1e;j1w;j1n;j1s;j1u;j1l; ...
           j2e;j2w;j2n;j2s;j2u;j2l];
  
-irow_bdy=irow_int(end)+[i1e,i1w,i1n,i1s,i1u,i1l, ...   
-                        i1e,i1w,i1n,i1s,i1u,i1l]';
+irow_bdy=irow_int(end)+ones(length(jcol_bdy),1);
 
 dx_=dx(gam);
 dy_=dy(gam);
@@ -192,13 +231,16 @@ b_cond=0;
 jcol=[jcol_int;jcol_bdy;jcol_cond];
 irow=[irow_int;irow_bdy;irow_cond];
 coef=[coef_int;coef_bdy;coef_cond];
+%jcol=[jcol_int;jcol_cond];
+%irow=[irow_int;irow_cond];
+%coef=[coef_int;coef_cond];
 
 
 A = sparse(irow,jcol,coef);
 
 
-b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
-%b=b_int;
+y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+%y=b_int;
 
 %keyboard
 gamma_initial=zeros(n,1);
@@ -209,7 +251,7 @@ for ii=1:nit_p
     disp(['ii=',num2str(ii)]);
     disp('starting LSQR()')
     tic
-    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,b,1e-15,nit,[],[],gamma_initial);
+    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,y,1e-15,nit,[],[],gamma_initial);
     display(['LSQR() took ',num2str(toc),' seconds for ',num2str(length(lsvec)),' iterations']);
     %keyboard
     if length(lsvec)==length(resvec)
@@ -224,14 +266,14 @@ for ii=1:nit_p
     gamma_p=nan*s;
     gamma_p(gam)=gamma;
     save(['data/gamma_p_',num2str(ii),'.mat'])
-    
+    keyboard
     % lower
     bb=get_b(gamma_p,n1,n2,n3,dx,dy,dz);
     n1=bb.*n1;
     n2=bb.*n2;
     n3=bb.*n3;
     [divn,~,~,~,~]=div_n(n1,n2,n3,dx,dy,dz);
-    b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+    y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
     
     gamma_initial=gamma_p(gam);
     nit=400;

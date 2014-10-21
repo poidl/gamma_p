@@ -11,7 +11,8 @@ total_time=tic;
 
 [s,ct,gamma_96]=make_mask_96(s,ct,p,gamma_96,longs,lats);
 
-save('data/input_data.mat')
+vars = {'s','ct','p','lats','longs'};
+save('data/input_data.mat',vars{:})
 
 user_input;
 
@@ -197,7 +198,7 @@ coef=[coef_int;coef_bdy;coef_cond];
 A = sparse(irow,jcol,coef);
 
 
-b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
 %b=b_int;
 
 %keyboard
@@ -209,7 +210,7 @@ for ii=1:nit_p
     disp(['ii=',num2str(ii)]);
     disp('starting LSQR()')
     tic
-    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,b,1e-15,nit,[],[],gamma_initial);
+    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,y,1e-15,nit,[],[],gamma_initial);
     display(['LSQR() took ',num2str(toc),' seconds for ',num2str(length(lsvec)),' iterations']);
     %keyboard
     if length(lsvec)==length(resvec)
@@ -226,12 +227,16 @@ for ii=1:nit_p
     save(['data/gamma_p_',num2str(ii),'.mat'])
     
     % lower
-    bb=get_b(gamma_p,n1,n2,n3,dx,dy,dz);
-    n1=bb.*n1;
-    n2=bb.*n2;
-    n3=bb.*n3;
+    b=get_b_optimized(gamma_p,n1,n2,n3,dx,dy,dz);
+    %keyboard
+    bx=0.5*(b+circshift(b,[0 0 -1]));
+    by=0.5*(b+circshift(b,[0 -1 0]));
+    bz=0.5*(b+circshift(b,[-1 0 0]));
+    n1=bx.*n1;
+    n2=by.*n2;
+    n3=bz.*n3;
     [divn,~,~,~,~]=div_n(n1,n2,n3,dx,dy,dz);
-    b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+    y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
     
     gamma_initial=gamma_p(gam);
     nit=400;
@@ -239,9 +244,9 @@ for ii=1:nit_p
 %         nit=2000;
 %     end
     if ii==1
-        myb=bb;
+        myb=b;
     else
-        myb=myb.*bb;
+        myb=myb.*b;
     end
     if ii==nit_p
         save_netcdf03(myb,'b','data/b.nc')

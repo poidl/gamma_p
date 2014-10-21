@@ -11,7 +11,6 @@ total_time=tic;
 
 [s,ct,gamma_96]=make_mask_96(s,ct,p,gamma_96,longs,lats);
 
-save('data/input_data.mat')
 
 user_input;
 
@@ -45,13 +44,13 @@ int=interior(:);
 % gs= bdy & circshift(interior,[0 -1  0]);
 % gl= bdy & circshift(interior,[1  0  0]);
 % gu= bdy & circshift(interior,[-1 0  0]);
-% boundary points which have a neighbour
-ge= bdy & circshift(interior|bdy,[0  0  1]); 
-gw= bdy & circshift(interior|bdy,[0  0 -1]);
-gn= bdy & circshift(interior|bdy,[0  1  0]);
-gs= bdy & circshift(interior|bdy,[0 -1  0]);
-gl= bdy & circshift(interior|bdy,[1  0  0]);
-gu= bdy & circshift(interior|bdy,[-1 0  0]);
+% boundary points which have an interior neighbour
+ge= bdy & circshift(interior,[0  0  1]); 
+gw= bdy & circshift(interior,[0  0 -1]);
+gn= bdy & circshift(interior,[0  1  0]);
+gs= bdy & circshift(interior,[0 -1  0]);
+gl= bdy & circshift(interior,[1  0  0]);
+gu= bdy & circshift(interior,[-1 0  0]);
 
 if ~zonally_periodic
     ge(:,:,1)=false;
@@ -66,6 +65,46 @@ no_bdyeq= ge+gw+gn+gs+gl+gu; % number of boundary eq. at point
 has_bdyeq=no_bdyeq(:)~=0;
 
 gam= int | has_bdyeq;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+s(~gam)=nan;
+ct(~gam)=nan;
+[n1,n2,n3]=get_n(s,ct,p,dx,dy,dz);
+[divn,interior,dx3,dy3,dz3]=div_n(n1,n2,n3,dx,dy,dz);
+bdy= ~isnan(s) & ~interior;
+int=interior(:);
+%sreg=cumsum(int); % label interior grid points
+%sreg(~int)=nan;
+
+% % boundary points which have a neighbouring intererior point
+% ge= bdy & circshift(interior,[0  0  1]); % westward neighbour is interior pt -> form eastward gradient eq. here
+% gw= bdy & circshift(interior,[0  0 -1]);
+% gn= bdy & circshift(interior,[0  1  0]);
+% gs= bdy & circshift(interior,[0 -1  0]);
+% gl= bdy & circshift(interior,[1  0  0]);
+% gu= bdy & circshift(interior,[-1 0  0]);
+% boundary points which have an interior neighbour
+ge= bdy & circshift(interior,[0  0  1]); 
+gw= bdy & circshift(interior,[0  0 -1]);
+gn= bdy & circshift(interior,[0  1  0]);
+gs= bdy & circshift(interior,[0 -1  0]);
+gl= bdy & circshift(interior,[1  0  0]);
+gu= bdy & circshift(interior,[-1 0  0]);
+
+if ~zonally_periodic
+    ge(:,:,1)=false;
+    gw(:,:,end)=false;
+end
+gn(:,1,:)=false;
+gs(:,end,:)=false;
+gl(1,:,:)=false;
+gu(end,:,:)=false;
+
+no_bdyeq= ge+gw+gn+gs+gl+gu; % number of boundary eq. at point
+has_bdyeq=no_bdyeq(:)~=0;
+
+gam= int | has_bdyeq;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % numbering well definied gammas
 sreg=cumsum(gam);
@@ -164,7 +203,7 @@ n=sum(int)+sum(has_bdyeq);
 
 % condition
 jcol_cond=(1:n)';     
-irow_cond=(irow_bdy(end)+1)*ones(n,1);
+irow_cond=(irow_int(end)+1)*ones(n,1);
 % TODO: THIS SHOULD BE A VOLUME INTEGRAL; WEIGHT BY VOLUME
 dz3=0.5*(dz+circshift(dz,[1 0 0])); % re-grid onto original grid
 dz3(1,:,:)=dz(1,:,:); % fix surface
@@ -189,17 +228,31 @@ b_cond=0;
 %jcol=jcol_int;
 %irow=irow_int;
 %coef=coef_int;
-jcol=[jcol_int;jcol_bdy;jcol_cond];
-irow=[irow_int;irow_bdy;irow_cond];
-coef=[coef_int;coef_bdy;coef_cond];
+% jcol=[jcol_int;jcol_bdy;jcol_cond];
+% irow=[irow_int;irow_bdy;irow_cond];
+% coef=[coef_int;coef_bdy;coef_cond];
+lon=longs;
+lat=lats;
+bbbdy= 188<=lon(:) & lon(:)<=188.5 & -16.5<=lat(:) & lat(:)<=-16; % 16 S, 188 E
+if sum(bbbdy)~=nz
+    disp('WARNING: multiple backbones (or none at all)')
+    keyboard
+end
+bbbdy= int & bbbdy;
+j1_bdy= sr(bbbdy); % column indices for matrix coef. 1
+i1_bdy=irow_int(end)+1+(1:sum(bbbdy));
+
+jcol=[jcol_int;jcol_cond;j1_bdy];
+irow=[irow_int;irow_cond;i1_bdy'];
+coef=[coef_int;coef_cond;ones(length(j1_bdy),1)];
 
 
 A = sparse(irow,jcol,coef);
 
 
-b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
-%b=b_int;
-
+y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+y=[y;gamma_96(bbbdy)];
+    
 %keyboard
 gamma_initial=zeros(n,1);
 nit=10000;
@@ -209,7 +262,7 @@ for ii=1:nit_p
     disp(['ii=',num2str(ii)]);
     disp('starting LSQR()')
     tic
-    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,b,1e-15,nit,[],[],gamma_initial);
+    [gamma,flag,relres,iter,resvec,lsvec] = lsqr(A,y,1e-15,nit,[],[],gamma_initial);
     display(['LSQR() took ',num2str(toc),' seconds for ',num2str(length(lsvec)),' iterations']);
     %keyboard
     if length(lsvec)==length(resvec)
@@ -224,14 +277,14 @@ for ii=1:nit_p
     gamma_p=nan*s;
     gamma_p(gam)=gamma;
     save(['data/gamma_p_',num2str(ii),'.mat'])
-    
+    keyboard
     % lower
     bb=get_b(gamma_p,n1,n2,n3,dx,dy,dz);
     n1=bb.*n1;
     n2=bb.*n2;
     n3=bb.*n3;
     [divn,~,~,~,~]=div_n(n1,n2,n3,dx,dy,dz);
-    b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
+    y=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
     
     gamma_initial=gamma_p(gam);
     nit=400;

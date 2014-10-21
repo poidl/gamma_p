@@ -6,6 +6,9 @@ addpath(genpath('../../../../gsw_matlab_v3_02'))
 xi=10;
 yi=10;
 zi=10;
+% xi=3;
+% yi=5;
+% zi=4;
 
 ts=7; % surface temperature south
 tn=5; % surface temperature north
@@ -58,8 +61,21 @@ longs=repmat(permute(longs,[3,1,2]),[zi 1 1]);
 %ct(15)=nan; % 15 is center bottom
 %s(24:25)=nan;
 %ct(24:25)=nan;
-s(end,5,5)=nan;
-ct(end,5,5)=nan;
+
+stemp=s(end-3:end,5,5);
+cttemp=ct(end-3:end,5,5);
+s(end-3:end,:,:)=nan;
+ct(end-3:end,:,:)=nan;
+s(end-3:end,5,5)=stemp;
+ct(end-3:end,5,5)=cttemp;
+
+%s(end,3,2)=35;
+%ct(end,3,2)=2;
+
+%s(end-1:end,5,4)=35;
+%ct(end-1:end,5,4)=2;
+% s(end-1:end,5,3)=35;
+% ct(end-1:end,5,3)=2;
 % s(3)=nan;
 % ct(3)=nan;
 
