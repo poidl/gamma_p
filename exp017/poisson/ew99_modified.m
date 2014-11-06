@@ -1,7 +1,8 @@
-function [ew99]=ew99_modified(s,ct,p,dx,dy,dz,modified)
-error('dx->lon')
+function [ew99]=ew99_modified(s,ct,p,lon,lat,modified)
+
 user_input;
 
+[dx,dy,dz]=get_dx(lon,lat,p);
 [nz,ny,nx]=size(s);
 
 [n1,n2,n3]=get_n(s,ct,p,dx,dy,dz);
