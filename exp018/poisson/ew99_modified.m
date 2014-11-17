@@ -1,5 +1,7 @@
 function [ew99]=ew99_modified(s,ct,p,lon,lat,modified)
-% solves a “clean” Poisson problem, i.e. a point is a boundary point if and only if it has an interior neighbour.
+% solves a “clean” (?) Poisson problem, i.e. a point is a boundary point if
+% and only if it has an interior neighbour, and the gradient equation at the boundary is
+% only formed in direction to the interior point
 
 user_input;
 
