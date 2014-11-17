@@ -5,8 +5,8 @@ user_input;
 [dx,dy,dz]=get_dx_ones(lon,lat,p);
 [nz,ny,nx]=size(s);
 
-[n1,n2,n3]=get_n(s,ct,p,dx,dy,dz);
-[divn,interior,dx3,dy3,dz3]=div_n(n1,n2,n3,dx,dy,dz);
+[n1,n2,n3]=get_n_old(s,ct,p,dx,dy,dz);
+[divn,interior,dx3,dy3,dz3]=div_n_old(n1,n2,n3,dx,dy,dz);
 bdy= ~isnan(s) & ~interior;
 int=interior(:);
 %sreg=cumsum(int); % label interior grid points
@@ -200,11 +200,11 @@ for ii=1:nit_p
     save(['data/gamma_p_',num2str(ii),'.mat'])
     
     % lower
-    bb=get_b(gamma_p,n1,n2,n3,dx,dy,dz);
+    bb=get_b_old(gamma_p,n1,n2,n3,dx,dy,dz);
     n1=bb.*n1;
     n2=bb.*n2;
     n3=bb.*n3;
-    [divn,~,~,~,~]=div_n(n1,n2,n3,dx,dy,dz);
+    [divn,~,~,~,~]=div_n_old(n1,n2,n3,dx,dy,dz);
     b=get_y(divn,n1,n2,n3,int,gam,j2e,j2w,j2n,j2s,j1u,j1l,b_cond);
     
     gamma_initial=gamma_p(gam);
